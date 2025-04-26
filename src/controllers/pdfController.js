@@ -2,7 +2,6 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { PdfDocument } from "../models/documentSchema.js";
-import pdf from "pdf-parse";
 import fs from "fs";
 import path from "path";
 
@@ -33,8 +32,11 @@ export const uploadAndExtractPdf = asyncHandler(async (req, res) => {
       // Read file as buffer
       const pdfBuffer = fs.readFileSync(pdfLocalPath);
       
+      // Dynamically import pdf-parse only when needed
+      const pdfParse = await import("pdf-parse");
+      
       // Use pdf-parse to extract text
-      pdfData = await pdf(pdfBuffer);
+      pdfData = await pdfParse.default(pdfBuffer);
       extractedText = pdfData.text;
     } catch (error) {
       console.error("Error extracting text from PDF:", error);
