@@ -3,7 +3,8 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 import userRoute from './routes/userRoute.js';
-
+import pdfRoute from './routes/pdfRoute.js';
+import geminiRoute from './routes/geminiRoute.js';
 
 
 import { config } from 'dotenv';
@@ -26,6 +27,8 @@ app.use(cookieParser());
 // Route setup
 app.use('/api/v1/users', userRoute);  
 app.use('/api/v1/admin', userRoute);  
+app.use('/api/v1/pdf',pdfRoute);
+app.use('/api/v1/gemini', geminiRoute);
 
 
 // Export the app for external use
