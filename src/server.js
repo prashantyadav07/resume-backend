@@ -11,7 +11,10 @@ cloudinary.config({
 
 // Connect to database
 dbConnect()
-  .then(() => {
+  .then((connection) => {
+    if (!connection) {
+      console.log('Running server without database connection');
+    }
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
@@ -19,5 +22,9 @@ dbConnect()
   })
   .catch(error => {
     console.error('Failed to connect to database:', error);
-    process.exit(1);
+    // Still start the server to handle routes that don't require DB
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT} (without database)`);
+    });
   });
