@@ -1,30 +1,23 @@
-import dotenv from 'dotenv';
-import {app} from '../src/app.js';
-import dbConnect from '../src/db/database.js';
-dotenv.config({
-    path:"./.env"
+import { app } from './app.js';
+import dbConnect from './db/database.js';
+import { v2 as cloudinary } from 'cloudinary';
+
+// Configure Cloudinary
+cloudinary.config({  
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,  
+  api_key: process.env.CLOUDINARY_API_KEY,  
+  api_secret: process.env.CLOUDINARY_API_SECRET 
 });
 
-
-import {v2 as cloudinary} from 'cloudinary'
-import fs from 'fs'
-
-
-          
-cloudinary.config({ 
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
-  api_key: process.env.CLOUDINARY_API_KEY, 
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
-
+// Connect to database
 dbConnect()
-        .then(() => {
-            console.log('MongoDB Connected')
-            app.listen(process.env.PORT || 8000 , () => {
-                console.log(`Server is Running at ${process.env.PORT || 8000}`)
-            })
-        })
-        .catch((err)=>{
-            console.log("MongoDB Connection Failed",err);
-        })
+  .then(() => {
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch(error => {
+    console.error('Failed to connect to database:', error);
+    process.exit(1);
+  });
