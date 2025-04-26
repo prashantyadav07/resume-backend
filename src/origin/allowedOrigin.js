@@ -1,9 +1,9 @@
 export const allowedOrigins = [
     "http://localhost:5173",
-    "https://prime-test-frontend.vercel.app/",
-    "https://prime-test-frontend.vercel.app",
-    "https://prime-test-frontend-git-main-ritik-latiyans-projects.vercel.app/",
-    "https://prime-test-frontend-git-main-ritik-latiyans-projects.vercel.app",
-    "https://prime-test-frontend-jrovqfko9-ritik-latiyans-projects.vercel.app/",
-    "https://prime-test-frontend-jrovqfko9-ritik-latiyans-projects.vercel.app"
+    "https://resume-backend-nine.vercel.app/",
+    "https://resume-backend-nine.vercel.app",
+    "https://resume-backend-git-main-prashant-yadavs-projects-1570311f.vercel.app/",
+    "https://resume-backend-git-main-prashant-yadavs-projects-1570311f.vercel.app",
+    "https://resume-backend-3yu3v59ut-prashant-yadavs-projects-1570311f.vercel.app/",
+    "https://resume-backend-3yu3v59ut-prashant-yadavs-projects-1570311f.vercel.app"
 ] ;
