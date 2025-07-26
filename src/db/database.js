@@ -1,32 +1,34 @@
-// --- START OF FILE db/database.js (CORRECTED) ---
+// src/db/database.js
 
 import mongoose from 'mongoose';
 import admin from 'firebase-admin';
 
-// ✅ NEW, COMPATIBLE WAY TO IMPORT JSON
+// ✅ createRequire is REQUIRED for importing JSON with ES Modules
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const serviceAccount = require('../serviceAccountKey.json');
 
+// ✅ Render ke according correct JSON path
+const serviceAccount = require('/etc/secrets/serviceAccountKey.json');
 
 const connectDb = async () => {
   try {
-    // Initialize Firebase Admin only if it hasn't been initialized already
+    // Firebase Admin Initialize (Only Once)
     if (!admin.apps.length) {
       admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
+        credential: admin.credential.cert(serviceAccount),
       });
-      console.log("Firebase Admin SDK initialized successfully.");
+      console.log('✅ Firebase Admin SDK initialized');
     }
 
-    // Connect to MongoDB
+    // MongoDB Connect
     const connectionInstance = await mongoose.connect(process.env.MONGODB_URI, {
-      dbName: "projectdare"
+      dbName: 'projectdare', // Change this if needed
     });
-    console.log(`MongoDB connected: ${connectionInstance.connection.host}`);
+
+    console.log(`✅ MongoDB connected: ${connectionInstance.connection.host}`);
     return connectionInstance;
   } catch (error) {
-    console.error('Error during initialization: ', error.message);
+    console.error('❌ Initialization error:', error.message);
     process.exit(1);
   }
 };
