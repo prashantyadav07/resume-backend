@@ -1,7 +1,14 @@
+// --- START OF FILE models/documentSchema.js ---
+
 import mongoose from "mongoose";
 
 const PdfDocumentSchema = new mongoose.Schema(
   {
+    user: {
+      type: String, // This will store the Firebase UID
+      required: true,
+      index: true,
+    },
     title: {
       type: String,
       trim: true,
@@ -25,62 +32,16 @@ const PdfDocumentSchema = new mongoose.Schema(
       required: [true, "Extracted text is required"]
     },
     metaData: {
-      pageCount: {
-        type: Number,
-        default: 0
-      },
-      info: {
-        type: Object,
-        default: {}
-      },
-      fileSize: {
-        type: Number,
-        default: 0
-      },
-      mimeType: {
-        type: String,
-        default: 'application/pdf'
-      },
-      uploadDate: {
-        type: Date,
-        default: Date.now
-      }
+      pageCount: { type: Number, default: 0 },
+      info: { type: Object, default: {} },
+      fileSize: { type: Number, default: 0 },
     },
-    status: {
-      type: String,
-      enum: ['processing', 'completed', 'error'],
-      default: 'completed'
-    }
   },
   {
     timestamps: true,
   }
 );
 
-// ✅ Fix the name here
-PdfDocumentSchema.index({ title: 'text', extractedText: 'text' });
-PdfDocumentSchema.index({ createdAt: -1 });
-
-PdfDocumentSchema.methods.getSummary = function () {
-  return {
-    id: this._id,
-    title: this.title,
-    description: this.description,
-    filename: this.filename,
-    pageCount: this.metaData.pageCount,
-    fileSize: this.metaData.fileSize,
-    createdAt: this.createdAt
-  };
-};
-
-PdfDocumentSchema.methods.getTextPreview = function (length = 500) {
-  if (!this.extractedText) return '';
-  return this.extractedText.substring(0, length) +
-    (this.extractedText.length > length ? '...' : '');
-};
-
-PdfDocumentSchema.virtual('fileUrl').get(function () {
-  return `/files/${this._id}/${this.filename}`;
-});
+PdfDocumentSchema.index({ user: 1, createdAt: -1 });
 
 export const PdfDocument = mongoose.model("PdfDocument", PdfDocumentSchema);

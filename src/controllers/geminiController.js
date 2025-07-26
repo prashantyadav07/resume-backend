@@ -1,136 +1,157 @@
+// --- START OF FILE src/controllers/geminiController.js ---
+
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import dotenv from 'dotenv';
-import mongoose from 'mongoose';
 import { PdfDocument } from "../models/documentSchema.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 
-dotenv.config();
+// Initialize genAI variable (will be set when first used)
+let genAI = null;
 
-// Initialize Gemini AI with your API key
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-/**
- * Analyze and rate a resume with Gemini AI
- * @param {Object} req - Express request object with resume ID
- * @param {Object} res - Express response object
- */
-export const analyzeResume = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Validate MongoDB ObjectId
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid resume ID format"
-      });
+// Function to get or initialize genAI
+const getGenAI = () => {
+  if (!genAI) {
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("❌ GEMINI_API_KEY is not set in environment variables");
+      throw new Error("GEMINI_API_KEY is required but not found in environment variables");
     }
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  }
+  return genAI;
+};
 
-    // Fetch the document directly from the database using the model
-    const pdfDocument = await PdfDocument.findById(id);
+export const analyzeResume = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const userUID = req.user.uid;
 
-    if (!pdfDocument) {
-      return res.status(404).json({
-        success: false,
-        message: "Resume not found"
-      });
-    }
+  if (!id) throw new ApiError(400, "Document ID is required.");
+  
+  const pdfDocument = await PdfDocument.findById(id);
 
-    // Get extracted text from the document
-    const resumeText = pdfDocument.extractedText;
+  if (!pdfDocument) throw new ApiError(404, "Resume not found.");
+  
+  if (pdfDocument.user.toString() !== userUID) {
+    throw new ApiError(403, "Forbidden: You do not have permission to analyze this document.");
+  }
+  
+  const resumeText = pdfDocument.extractedText;
+  if (!resumeText || resumeText.trim() === '') {
+    throw new ApiError(400, "Could not analyze. No text found in this PDF.");
+  }
 
-    if (!resumeText || resumeText.trim() === '') {
-      return res.status(400).json({
-        success: false,
-        message: "No text content found in resume"
-      });
-    }
+  const model = getGenAI().getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Initialize Gemini model
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const prompt = `
+    You are an ATS (Applicant Tracking System) scanner. Analyze this resume like an ATS would and provide concise feedback.
 
-    // Create the prompt for resume analysis
-    const prompt = `
-You are a professional resume evaluator specializing in tech industry resumes. Analyze the following resume for a tech position and rate it on a scale of 0-100.
+    ATS SCORING (0-100):
+    - Keywords & Skills Match: 40%
+    - Format & Structure: 30% 
+    - Experience Relevance: 20%
+    - Contact & Basic Info: 10%
 
-Evaluate these criteria:
-1. Technical Skills (25 points): Relevance and depth of technical skills
-2. Projects & Experience (25 points): Quality of projects, real-world experience
-3. Education & Certifications (15 points): Relevant education and certifications
-4. Resume Format & Clarity (15 points): Organization, readability, professional presentation
-5. Impact & Achievements (20 points): Quantifiable achievements, impact statements
-
-For each criterion, provide:
-- Score (out of allocated points)
-- Analysis (2-3 sentences)
-- Improvement suggestions (1-2 specific recommendations)
-
-Then provide:
-- Overall Score (sum of all criteria, out of 100)
-- Key Strengths (3 bullet points)
-- Priority Improvements (3 bullet points)
-- Brief overall assessment (2-3 sentences)
-
-Format as clean JSON with this structure:
-{
-  "criteria": [
+    Respond with EXACTLY this JSON (keep all text concise and under 15 words per item):
     {
-      "name": "Technical Skills",
-      "score": 20,
-      "analysis": "string",
-      "improvements": "string"
-    },
-    ...other criteria
-  ],
-  "overallScore": 85,
-  "keyStrengths": ["strength1", "strength2", "strength3"],
-  "priorityImprovements": ["improvement1", "improvement2", "improvement3"],
-  "overallAssessment": "string"
-}
+      "overallScore": number,
+      "keyStrengths": [
+        "Brief strength 1",
+        "Brief strength 2", 
+        "Brief strength 3"
+      ],
+      "priorityImprovements": [
+        "Quick fix 1",
+        "Quick fix 2",
+        "Quick fix 3"
+      ],
+      "overallAssessment": "One sentence ATS summary"
+    }
 
-Here is the resume:
-${resumeText}
-`;
+    Resume: ${resumeText.substring(0, 2000)}
+  `;
 
-    // Generate analysis with Gemini
-    const result = await model.generateContent(prompt);
+  try {
+    // Optimized config for speed and conciseness
+    const generationConfig = {
+      temperature: 0.1,  // Very focused responses
+      topK: 1,
+      topP: 0.5,
+      maxOutputTokens: 400,  // Much smaller limit
+    };
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig,
+    });
+    
     const response = await result.response;
     const analysisText = response.text();
 
-    // Remove the markdown formatting (```json and ```)
-    const cleanedText = analysisText.replace(/```json|```/g, '').trim();
-
-    try {
-      // Parse the cleaned response as JSON
-      const analysisData = JSON.parse(cleanedText);
-
-      // Return the analysis results
-      return res.status(200).json({
-        success: true,
-        resumeId: id,
-        resumeName: pdfDocument.filename,
-        analysis: analysisData
-      });
-    } catch (parseError) {
-      console.error("Error parsing Gemini response:", parseError);
-
-      // Return raw text if JSON parsing fails
-      return res.status(200).json({
-        success: true,
-        resumeId: id,
-        resumeName: pdfDocument.filename,
-        analysis: {
-          raw: cleanedText,
-          parseError: "Could not parse response as JSON"
-        }
-      });
+    // Better JSON extraction
+    let cleanedText = analysisText.replace(/```json|```/g, '').trim();
+    
+    // Remove any text before the first { and after the last }
+    const firstBrace = cleanedText.indexOf('{');
+    const lastBrace = cleanedText.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      cleanedText = cleanedText.substring(firstBrace, lastBrace + 1);
     }
 
+    const analysisData = JSON.parse(cleanedText);
+
+    // Validate the response structure
+    if (!analysisData.overallScore || !Array.isArray(analysisData.keyStrengths) || 
+        !Array.isArray(analysisData.priorityImprovements)) {
+      throw new Error("Invalid analysis structure received from AI");
+    }
+
+    // Ensure score is within valid range
+    analysisData.overallScore = Math.max(0, Math.min(100, analysisData.overallScore));
+
+    return res.status(200).json(new ApiResponse(
+        200, 
+        { 
+          resumeId: id, 
+          resumeName: pdfDocument.filename, 
+          analysis: analysisData,
+          analysisTimestamp: new Date().toISOString()
+        }, 
+        "Analysis completed successfully"
+      )
+    );
   } catch (error) {
-    console.error("Error analyzing resume:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to analyze resume",
-      error: error.message
-    });
+    console.error("Error during Gemini analysis or parsing:", error);
+    
+    // Handle different types of errors
+    if (error.message && error.message.includes('API key not valid')) {
+      throw new ApiError(401, "Invalid Gemini API key. Please check your API key configuration.");
+    }
+    
+    if (error.message && error.message.includes('quota')) {
+      throw new ApiError(429, "API quota exceeded. Please try again later.");
+    }
+    
+    if (error.status === 400) {
+      throw new ApiError(400, "Bad request to Gemini API. Please check the request format.");
+    }
+    
+    if (error.status === 403) {
+      throw new ApiError(403, "Access forbidden. Please check your API key permissions.");
+    }
+    
+    // JSON parsing error
+    if (error instanceof SyntaxError && error.message.includes('JSON')) {
+      throw new ApiError(500, "Failed to parse AI response. The AI service returned invalid data.");
+    }
+    
+    // Generic network/API errors
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      throw new ApiError(503, "Unable to connect to AI service. Please check your internet connection.");
+    }
+    
+    // Fallback for any other errors
+    console.error("Unhandled error type:", error.constructor.name, error.message);
+    throw new ApiError(500, "The AI service failed. This might be a temporary issue.");
   }
-};
+});
