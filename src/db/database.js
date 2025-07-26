@@ -1,18 +1,23 @@
-// --- START OF FILE db/database.js ---
+// --- START OF FILE db/database.js (CORRECTED) ---
 
 import mongoose from 'mongoose';
 import admin from 'firebase-admin';
 
-// Correct path to your service account key file
-import serviceAccount from '../serviceAccountKey.json' assert { type: "json" };
+// ✅ NEW, COMPATIBLE WAY TO IMPORT JSON
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const serviceAccount = require('../serviceAccountKey.json');
+
 
 const connectDb = async () => {
   try {
-    // Initialize Firebase Admin
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    console.log("Firebase Admin SDK initialized successfully.");
+    // Initialize Firebase Admin only if it hasn't been initialized already
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+      });
+      console.log("Firebase Admin SDK initialized successfully.");
+    }
 
     // Connect to MongoDB
     const connectionInstance = await mongoose.connect(process.env.MONGODB_URI, {
